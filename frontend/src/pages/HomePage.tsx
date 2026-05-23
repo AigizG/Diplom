@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { activitiesApi, eventsApi, reviewsApi } from '../api/endpoints';
 import { StatusBadge } from '../components/StatusBadge';
 import type { ActivityCategoryDto, ActivityDto, EventDto, ReviewDto } from '../types';
-import { activityTitle, formatDate, label } from '../utils';
+import { activityTitle, formatDate, formatPrice, label } from '../utils';
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -63,10 +63,11 @@ export function HomePage() {
                   </div>
                   <p>{activity.shortDescription || activity.description || 'Программа активного отдыха'}</p>
                   <div className="metaLine"><MapPin size={15} /> {label(activity.location)} · {label(activity.durationHours)} ч · {label(activity.difficultyLevel)}</div>
-                  <strong>{label(activity.price)} ₽</strong>
+                  <strong>{formatPrice(activity.price)}</strong>
                 </div>
               </Link>
             ))}
+            {!activities.length && <div className="empty">Активности пока не опубликованы</div>}
           </div>
         </section>
 
@@ -82,12 +83,14 @@ export function HomePage() {
                   <StatusBadge value={event.status} />
                 </Link>
               ))}
+              {!events.length && <div className="empty">Ближайших мероприятий пока нет</div>}
             </div>
           </div>
           <div>
             <h2>Категории</h2>
             <div className="categoryCloud">
               {categories.map((category) => <Link to={`/activities?category=${category.id}`} key={category.id}>{category.name}</Link>)}
+              {!categories.length && <span className="muted">Категории не найдены</span>}
             </div>
           </div>
         </section>
