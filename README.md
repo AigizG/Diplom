@@ -1,12 +1,10 @@
 # Информационная система активного отдыха
 
-Система управления бизнес-процессами компании по организации активного отдыха. Проект состоит из Spring Boot backend и React frontend: каталог активностей, расписание мероприятий, бронирования, внутренняя тестовая оплата, кабинеты по ролям, снаряжение, отзывы, уведомления, документы и JSON-отчёты.
-
-Интерфейс и пользовательские сообщения ориентированы на русскоязычную аудиторию. Enum-значения в API остаются техническими на английском, а во frontend отображаются русские подписи.
+Spring Boot + React приложение для компании активного отдыха: каталог активностей, расписание мероприятий, бронирования, внутренняя тестовая оплата, кабинеты по ролям, снаряжение, отзывы, документы и отчёты.
 
 ## Стек
 
-Java 17, Spring Boot 3, Spring Web, Spring Security, JWT, Spring Data JPA, Hibernate, PostgreSQL, Flyway, Lombok, MapStruct, Bean Validation, Springdoc OpenAPI, JUnit 5, Mockito.
+Backend: Java 17, Spring Boot 3, Spring Security, JWT, Spring Data JPA, PostgreSQL, Flyway, Lombok, MapStruct, Bean Validation, Springdoc OpenAPI, JUnit 5, Mockito.
 
 Frontend: React, Vite, TypeScript, axios.
 
@@ -15,19 +13,19 @@ Frontend: React, Vite, TypeScript, axios.
 Backend:
 
 ```powershell
-docker compose up --build
+mvn spring-boot:run
 ```
 
-Или локально:
+Или вместе с PostgreSQL:
 
 ```powershell
-mvn spring-boot:run
+docker compose up --build
 ```
 
 Frontend:
 
 ```powershell
-cd C:\Users\yuutu\DiplomFront
+cd frontend
 npm install
 npm run dev
 ```
@@ -56,19 +54,18 @@ npm run dev
 - `instructor@example.com / instructor123` - инструктор
 - `client@example.com / client123` - клиент
 
-## Роли и доступы
+## Роли
 
-- `CLIENT`: свои бронирования, оплаты, уведомления, отзывы.
-- `INSTRUCTOR`: свои мероприятия, участники, отчёт по мероприятию.
-- `MANAGER`: бронирования, мероприятия, тестовые оплаты, снаряжение, отзывы, документы, отчёты.
+- `CLIENT`: свои бронирования, оплаты, уведомления и отзывы.
+- `INSTRUCTOR`: свои мероприятия, участники и отчёт по мероприятию.
+- `MANAGER`: бронирования, мероприятия, тестовые оплаты, снаряжение, отзывы, документы и отчёты.
 - `ADMIN`: полный доступ, включая пользователей и сотрудников.
-- Гость: публичный каталог, категории, мероприятия, отзывы и Swagger.
 
 ## Тестовая оплата
 
-Реальная платёжная система не подключена. Не используются Stripe, PayPal, YooKassa, CloudPayments, Robokassa или другие внешние сервисы.
+Реальная платёжная система не подключена. Stripe, PayPal, YooKassa, CloudPayments, Robokassa и банковские SDK не используются.
 
-Оплата хранится как внутренняя сущность `Payment` с локальным `mockTransactionId` вида `MOCK-UUID`. Менеджер или администратор вручную меняет статус оплаты:
+Оплата хранится как внутренняя сущность `Payment` с локальным `mockTransactionId` формата `MOCK-UUID`. Менеджер или администратор вручную меняет статус оплаты:
 
 - `PENDING` - ожидает оплаты
 - `PARTIALLY_PAID` - частично оплачена
@@ -101,32 +98,34 @@ npm run dev
 - `/admin` - административная панель: пользователи, сотрудники, активности и справочники.
 - `/instructor` - кабинет инструктора: свои мероприятия, участники и отчёт.
 
-## Проверка работоспособности
+## Сценарий проверки
 
 1. Войти как клиент `client@example.com / client123`.
-2. Открыть каталог активностей и применить фильтры.
+2. Найти активность в каталоге.
 3. Открыть активность и создать бронирование.
 4. Войти как менеджер `manager@example.com / manager123`.
 5. Подтвердить бронирование.
 6. Создать тестовую оплату.
 7. Отметить оплату как оплаченную.
-8. Убедиться, что бронирование стало “Оплачена”.
-9. Войти как инструктор и посмотреть назначенные мероприятия.
-10. Отправить отчёт по мероприятию.
-11. Войти как администратор и проверить пользователей, сотрудников и отчёты.
+8. Проверить, что бронирование стало `Оплачена`.
+9. Войти как инструктор `instructor@example.com / instructor123`.
+10. Посмотреть свои мероприятия и участников.
+11. Создать отчёт по мероприятию.
+12. Войти как администратор `admin@example.com / admin123`.
+13. Проверить пользователей, сотрудников и отчёты.
 
 ## Проверка сборки
 
 Backend:
 
 ```powershell
-$env:JAVA_HOME='C:\Users\yuutu\.jdks\ms-21.0.11'
-& 'C:\Program Files\JetBrains\IntelliJ IDEA 2026.1.1\plugins\maven\lib\maven3\bin\mvn.cmd' test
+mvn clean test
 ```
 
 Frontend:
 
 ```powershell
-cd C:\Users\yuutu\DiplomFront
+cd frontend
+npm install
 npm run build
 ```

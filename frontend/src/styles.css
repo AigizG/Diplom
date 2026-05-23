@@ -659,6 +659,45 @@ th {
   font-size: 22px;
 }
 
+.toastStack {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 50;
+  display: grid;
+  gap: 10px;
+  width: min(360px, calc(100vw - 36px));
+}
+
+.toast {
+  border-radius: 8px;
+  padding: 12px 14px;
+  border: 1px solid #dce3ec;
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(17, 24, 39, .16);
+  color: #172033;
+}
+
+.toast.success {
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.toast.error {
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.toast.info {
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.confirmBody {
+  display: grid;
+  gap: 16px;
+}
+
 .jsonCard {
   max-height: 360px;
   overflow: auto;

@@ -4,8 +4,9 @@ import { Alert } from '../components/Alert';
 import { DataTable } from '../components/DataTable';
 import { SmartForm } from '../components/SmartForm';
 import { StatusBadge } from '../components/StatusBadge';
+import { useToast } from '../components/ToastProvider';
 import type { BookingDto, NotificationDto, PaymentDto, PaymentMethod } from '../types';
-import { bookingTitle, enumLabel, eventTitle, formatDate, formatPrice, label } from '../utils';
+import { enumLabel, eventTitle, formatDate, formatPrice, label } from '../utils';
 
 export function ClientDashboard() {
   const [bookings, setBookings] = useState<BookingDto[]>([]);
@@ -13,9 +14,13 @@ export function ClientDashboard() {
   const [notifications, setNotifications] = useState<NotificationDto[]>([]);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [actionKey, setActionKey] = useState('');
+  const toast = useToast();
 
   const load = async () => {
     setError('');
+    setLoading(true);
     try {
       const [bookingList, paymentList, notificationList] = await Promise.all([
         bookingsApi.my(),
@@ -27,6 +32,8 @@ export function ClientDashboard() {
       setNotifications(notificationList);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось загрузить кабинет');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -35,14 +42,39 @@ export function ClientDashboard() {
   }, []);
 
   const createPayment = async (bookingId: number, method: PaymentMethod) => {
+    const key = `payment-${bookingId}-${method}`;
     setMessage('');
     setError('');
+    setActionKey(key);
     try {
       await paymentsApi.createMock(bookingId, method);
       setMessage('Тестовая оплата создана');
+      toast.success('Тестовая оплата создана');
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не удалось создать оплату');
+      const text = err instanceof Error ? err.message : 'Не удалось создать оплату';
+      setError(text);
+      toast.error(text);
+    } finally {
+      setActionKey('');
+    }
+  };
+
+  const run = async (key: string, action: () => Promise<unknown>, success: string) => {
+    setMessage('');
+    setError('');
+    setActionKey(key);
+    try {
+      await action();
+      setMessage(success);
+      toast.success(success);
+      await load();
+    } catch (err) {
+      const text = err instanceof Error ? err.message : 'Ошибка операции';
+      setError(text);
+      toast.error(text);
+    } finally {
+      setActionKey('');
     }
   };
 
@@ -51,6 +83,7 @@ export function ClientDashboard() {
       <div className="pageHeader"><h1>Кабинет клиента</h1></div>
       <Alert>{error}</Alert>
       <Alert type="success">{message}</Alert>
+      {loading && <div className="alert info">Загружаем данные кабинета...</div>}
       <div className="alert info">Тестовая оплата. Реальная платёжная система не подключена. Статус оплаты изменяется менеджером или администратором.</div>
       <div className="panel">
         <h2>Мои бронирования</h2>
@@ -65,9 +98,22 @@ export function ClientDashboard() {
           ]}
           actions={(booking) => (
             <div className="inlineActions">
-              <button className="danger" disabled={booking.status === 'CANCELLED'} onClick={() => bookingsApi.cancel(Number(booking.id)).then(load).catch((err) => setError(err.message))}>Отменить бронирование</button>
+              <button
+                className="danger"
+                disabled={booking.status === 'CANCELLED' || actionKey === `cancel-${booking.id}`}
+                onClick={() => void run(`cancel-${booking.id}`, () => bookingsApi.cancel(Number(booking.id)), 'Бронирование отменено')}
+              >
+                {actionKey === `cancel-${booking.id}` ? 'Отменяем...' : 'Отменить бронирование'}
+              </button>
               {(['CASH', 'CARD_MOCK', 'BANK_TRANSFER_MOCK'] as PaymentMethod[]).map((method) => (
-                <button className="secondary" key={method} onClick={() => void createPayment(Number(booking.id), method)}>{enumLabel(method)}</button>
+                <button
+                  className="secondary"
+                  key={method}
+                  disabled={booking.status === 'CANCELLED' || actionKey === `payment-${booking.id}-${method}`}
+                  onClick={() => void createPayment(Number(booking.id), method)}
+                >
+                  {actionKey === `payment-${booking.id}-${method}` ? 'Создаём...' : enumLabel(method)}
+                </button>
               ))}
             </div>
           )}
@@ -79,7 +125,7 @@ export function ClientDashboard() {
           items={payments}
           columns={[
             { key: 'id', title: '№' },
-            { key: 'booking', title: 'Бронирование', render: (payment) => bookingTitle(payment.booking) || label(payment.bookingId) },
+            { key: 'bookingId', title: 'Бронирование', render: (payment) => `№ ${label(payment.bookingId)}` },
             { key: 'amount', title: 'Сумма', render: (payment) => formatPrice(payment.amount) },
             { key: 'method', title: 'Метод', render: (payment) => enumLabel(payment.method) },
             { key: 'status', title: 'Статус', render: (payment) => <StatusBadge value={payment.status} /> },
@@ -89,7 +135,13 @@ export function ClientDashboard() {
       </div>
       <div className="panel">
         <h2>Уведомления</h2>
-        <button className="secondary" onClick={() => notificationsApi.readAll().then(load).catch((err) => setError(err.message))}>Отметить все прочитанными</button>
+        <button
+          className="secondary"
+          disabled={actionKey === 'read-all'}
+          onClick={() => void run('read-all', () => notificationsApi.readAll(), 'Уведомления отмечены прочитанными')}
+        >
+          {actionKey === 'read-all' ? 'Отмечаем...' : 'Отметить все прочитанными'}
+        </button>
         <DataTable
           items={notifications}
           columns={[
@@ -98,7 +150,15 @@ export function ClientDashboard() {
             { key: 'createdAt', title: 'Дата', render: (item) => formatDate(item.createdAt) },
             { key: 'read', title: 'Прочитано', render: (item) => item.read ? 'Да' : 'Нет' },
           ]}
-          actions={(item) => !item.read ? <button className="secondary" onClick={() => notificationsApi.read(Number(item.id)).then(load).catch((err) => setError(err.message))}>Прочитано</button> : null}
+          actions={(item) => !item.read ? (
+            <button
+              className="secondary"
+              disabled={actionKey === `read-${item.id}`}
+              onClick={() => void run(`read-${item.id}`, () => notificationsApi.read(Number(item.id)), 'Уведомление отмечено прочитанным')}
+            >
+              {actionKey === `read-${item.id}` ? 'Отмечаем...' : 'Прочитано'}
+            </button>
+          ) : null}
         />
       </div>
       <div className="panel">
@@ -106,14 +166,15 @@ export function ClientDashboard() {
         <SmartForm
           submitText="Создать отзыв"
           fields={[
-            { name: 'activityId', label: 'ID активности', type: 'number', required: true },
-            { name: 'bookingId', label: 'ID бронирования', type: 'number' },
+            { name: 'bookingId', label: 'ID завершённого бронирования', type: 'number', required: true },
             { name: 'rating', label: 'Оценка', type: 'number', required: true },
             { name: 'text', label: 'Текст', type: 'textarea', required: true },
           ]}
           onSubmit={async (values) => {
             await reviewsApi.create(values);
             setMessage('Отзыв отправлен');
+            toast.success('Отзыв отправлен');
+            await load();
           }}
         />
       </div>
