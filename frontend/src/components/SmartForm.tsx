@@ -1,15 +1,21 @@
-﻿import { FormEvent, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { enumLabel } from '../utils';
 import { Alert } from './Alert';
+import { useToast } from './ToastProvider';
 
 export type FieldType = 'text' | 'email' | 'password' | 'number' | 'date' | 'datetime-local' | 'textarea' | 'select';
+
+export interface FieldOption {
+  value: string | number;
+  label: string;
+}
 
 export interface FieldConfig {
   name: string;
   label: string;
   type?: FieldType;
   required?: boolean;
-  options?: string[];
+  options?: Array<string | FieldOption>;
   placeholder?: string;
 }
 
@@ -26,6 +32,7 @@ export function SmartForm({
   onSubmit: (values: Record<string, unknown>) => Promise<void>;
   onCancel?: () => void;
 }) {
+  const { showToast } = useToast();
   const [values, setValues] = useState<Record<string, unknown>>(initialValues);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -42,7 +49,9 @@ export function SmartForm({
     setSuccess('');
     for (const field of fields) {
       if (field.required && !values[field.name]) {
-        setError(`Заполните поле "${field.label}"`);
+        const text = `Заполните поле "${field.label}"`;
+        setError(text);
+        showToast(text, 'error');
         return;
       }
     }
@@ -50,11 +59,21 @@ export function SmartForm({
     try {
       await onSubmit(values);
       setSuccess('Сохранено');
+      showToast('Сохранено', 'success');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка сохранения');
+      const text = err instanceof Error ? err.message : 'Ошибка сохранения';
+      setError(text);
+      showToast(text, 'error');
     } finally {
       setLoading(false);
     }
+  };
+
+  const renderOption = (option: string | FieldOption) => {
+    if (typeof option === 'string') {
+      return <option key={option} value={option}>{enumLabel(option)}</option>;
+    }
+    return <option key={option.value} value={option.value}>{option.label}</option>;
   };
 
   return (
@@ -79,9 +98,7 @@ export function SmartForm({
                 onChange={(event) => update(field.name, event.target.value)}
               >
                 <option value="">Выберите</option>
-                {field.options?.map((option) => (
-                  <option key={option} value={option}>{enumLabel(option)}</option>
-                ))}
+                {field.options?.map(renderOption)}
               </select>
             ) : (
               <input
@@ -96,7 +113,7 @@ export function SmartForm({
         ))}
       </div>
       <div className="formActions">
-        {onCancel && <button type="button" className="secondary" onClick={onCancel}>Отмена</button>}
+        {onCancel && <button type="button" className="secondary" disabled={loading} onClick={onCancel}>Отмена</button>}
         <button disabled={loading}>{loading ? 'Сохраняем...' : submitText}</button>
       </div>
     </form>
