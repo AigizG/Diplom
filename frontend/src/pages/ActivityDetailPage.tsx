@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { Alert } from '../components/Alert';
 import { DataTable } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
+import { useToast } from '../components/ToastProvider';
 import type { ActivityDetailsDto, ActivityDto, EventDto, ReviewDto } from '../types';
 import { activityTitle, formatDate, formatPrice, label, splitTextList, userName } from '../utils';
 
@@ -20,6 +21,8 @@ export function ActivityDetailPage() {
   const [participantsCount, setParticipantsCount] = useState(1);
   const [comment, setComment] = useState('');
   const [participantNames, setParticipantNames] = useState(['']);
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const toast = useToast();
 
   const activity = details?.activity;
   const events = details?.nearestEvents || [];
@@ -48,21 +51,29 @@ export function ActivityDetailPage() {
   const book = async () => {
     if (!user) {
       setError('Войдите как клиент, чтобы создать бронирование');
+      toast.error('Войдите как клиент, чтобы создать бронирование');
       return;
     }
     if (!selectedEventId) {
       setError('Выберите дату мероприятия');
+      toast.error('Выберите дату мероприятия');
       return;
     }
     setError('');
     setSuccess('');
+    setBookingLoading(true);
     try {
       const participants = Array.from({ length: participantsCount }, (_, index) => ({ fullName: participantNames[index] || `Участник ${index + 1}` }));
       await bookingsApi.create({ eventId: selectedEventId, participantsCount, comment, participants });
       setSuccess('Бронирование создано');
+      toast.success('Бронирование создано');
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не удалось создать бронирование');
+      const message = err instanceof Error ? err.message : 'Не удалось создать бронирование';
+      setError(message);
+      toast.error(message);
+    } finally {
+      setBookingLoading(false);
     }
   };
 
@@ -138,7 +149,9 @@ export function ActivityDetailPage() {
             <textarea value={comment} onChange={(event) => setComment(event.target.value)} />
           </label>
           <div className="totalLine"><span>Итого</span><strong>{formatPrice(total)}</strong></div>
-          <button disabled={!events.length || user?.role !== 'CLIENT'} onClick={() => void book()}>Создать бронирование</button>
+          <button disabled={!events.length || user?.role !== 'CLIENT' || bookingLoading} onClick={() => void book()}>
+            {bookingLoading ? 'Создаём...' : 'Создать бронирование'}
+          </button>
           {!user && <p className="muted">Для бронирования войдите как клиент. Если вы вошли под другой ролью, кнопка недоступна.</p>}
         </div>
       </div>

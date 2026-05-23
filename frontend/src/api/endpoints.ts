@@ -6,6 +6,7 @@ import type {
   AdminDashboardDto,
   BookingDto,
   DocumentDto,
+  EmployeeDto,
   EquipmentDto,
   EventDto,
   NotificationDto,
@@ -79,8 +80,8 @@ export const paymentsApi = {
 
 export const employeesApi = {
   create: (body: Record<string, unknown>) => api.post('/api/employees', body),
-  list: () => getList<UserDto>('/api/employees'),
-  get: (id: number) => getOne<UserDto>(`/api/employees/${id}`),
+  list: () => getList<EmployeeDto>('/api/employees'),
+  get: (id: number) => getOne<EmployeeDto>(`/api/employees/${id}`),
   update: (id: number, body: Record<string, unknown>) => api.put(`/api/employees/${id}`, body),
   deactivate: (id: number) => api.patch(`/api/employees/${id}/deactivate`),
   instructors: () => getList<UserDto>('/api/instructors'),

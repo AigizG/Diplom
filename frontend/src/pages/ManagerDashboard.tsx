@@ -13,13 +13,15 @@ import {
   usersApi,
 } from '../api/endpoints';
 import { Alert } from '../components/Alert';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { DataTable } from '../components/DataTable';
 import { JsonCard } from '../components/JsonCard';
 import { Modal } from '../components/Modal';
 import { FieldConfig, SmartForm } from '../components/SmartForm';
 import { StatusBadge } from '../components/StatusBadge';
-import type { ActivityDto, AdminDashboardDto, BookingDto, EquipmentDto, EventDto, ManagerDashboardDto, PaymentDto, ReviewDto, UserDto } from '../types';
-import { activityTitle, enumLabel, eventTitle, formatDate, formatPrice, label, reportTitle, userName } from '../utils';
+import { useToast } from '../components/ToastProvider';
+import type { ActivityDto, AdminDashboardDto, BookingDto, EmployeeDto, EquipmentDto, EventDto, ManagerDashboardDto, PaymentDto, ReviewDto, UserDto } from '../types';
+import { activityTitle, employeeUser, enumLabel, eventTitle, formatDate, formatPrice, label, reportTitle, userName } from '../utils';
 
 type Tab =
   | 'dashboard'
@@ -91,30 +93,41 @@ export function ManagerDashboard({ adminMode = false }: { adminMode?: boolean })
   const [equipment, setEquipment] = useState<EquipmentDto[]>([]);
   const [reviews, setReviews] = useState<ReviewDto[]>([]);
   const [users, setUsers] = useState<UserDto[]>([]);
-  const [employees, setEmployees] = useState<UserDto[]>([]);
+  const [employees, setEmployees] = useState<EmployeeDto[]>([]);
   const [reports, setReports] = useState<Record<string, unknown>>({});
   const [managerDashboard, setManagerDashboard] = useState<ManagerDashboardDto | null>(null);
   const [adminDashboard, setAdminDashboard] = useState<AdminDashboardDto | null>(null);
   const [period, setPeriod] = useState({ from: '', to: '' });
+  const [loading, setLoading] = useState(false);
+  const [actionKey, setActionKey] = useState('');
+  const [confirm, setConfirm] = useState<{ text: string; action: () => Promise<unknown>; success?: string; danger?: boolean } | null>(null);
+  const toast = useToast();
 
-  const run = async (action: () => Promise<unknown>, success = 'Готово') => {
+  const run = async (action: () => Promise<unknown>, success = 'Готово', key = success) => {
     setError('');
     setMessage('');
+    setActionKey(key);
     try {
       await action();
       setMessage(success);
+      toast.success(success);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка операции');
+      const text = err instanceof Error ? err.message : 'Ошибка операции';
+      setError(text);
+      toast.error(text);
+    } finally {
+      setActionKey('');
     }
   };
 
-  const confirmRun = (text: string, action: () => Promise<unknown>, success?: string) => {
-    if (window.confirm(text)) void run(action, success);
+  const confirmRun = (text: string, action: () => Promise<unknown>, success?: string, danger = true) => {
+    setConfirm({ text, action, success, danger });
   };
 
   const load = async () => {
     setError('');
+    setLoading(true);
     try {
       if (tab === 'activities') setActivities(await activitiesApi.list());
       if (tab === 'categories') setCategories(await activitiesApi.categories());
@@ -131,6 +144,8 @@ export function ManagerDashboard({ adminMode = false }: { adminMode?: boolean })
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось загрузить данные');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -176,6 +191,7 @@ export function ManagerDashboard({ adminMode = false }: { adminMode?: boolean })
       </div>
       <Alert>{error}</Alert>
       <Alert type="success">{message}</Alert>
+      {loading && <div className="alert info">Загружаем данные...</div>}
       {tab === 'dashboard' && (
         <WorkPanel title={adminMode ? 'Панель управления администратора' : 'Панель управления менеджера'}>
           {adminMode && adminDashboard ? (
@@ -224,7 +240,7 @@ export function ManagerDashboard({ adminMode = false }: { adminMode?: boolean })
             actions={(item) => (
               <div className="inlineActions">
                 <button className="secondary" onClick={() => setForm(<SmartForm fields={activityFields} submitText="Сохранить" initialValues={item} onCancel={() => setForm(null)} onSubmit={(values) => run(() => activitiesApi.update(Number(item.id), values), 'Активность обновлена').then(() => setForm(null))} />)}>Изменить</button>
-                <button className="danger" onClick={() => confirmRun('Удалить активность?', () => activitiesApi.remove(Number(item.id)), 'Активность удалена')}>Удалить</button>
+                <button className="danger" disabled={actionKey === `delete-activity-${item.id}`} onClick={() => confirmRun('Удалить активность?', () => activitiesApi.remove(Number(item.id)), 'Активность удалена')}>Удалить</button>
               </div>
             )}
           />
@@ -238,7 +254,7 @@ export function ManagerDashboard({ adminMode = false }: { adminMode?: boolean })
             actions={(item) => (
               <div className="inlineActions">
                 <button className="secondary" onClick={() => setForm(<SmartForm fields={[{ name: 'name', label: 'Название', required: true }, { name: 'description', label: 'Описание', type: 'textarea' }]} submitText="Сохранить" initialValues={item} onCancel={() => setForm(null)} onSubmit={(values) => run(() => activitiesApi.updateCategory(Number(item.id), values), 'Категория обновлена').then(() => setForm(null))} />)}>Изменить</button>
-                <button className="danger" onClick={() => confirmRun('Удалить категорию?', () => activitiesApi.deleteCategory(Number(item.id)), 'Категория удалена')}>Удалить</button>
+                <button className="danger" disabled={actionKey === `delete-category-${item.id}`} onClick={() => confirmRun('Удалить категорию?', () => activitiesApi.deleteCategory(Number(item.id)), 'Категория удалена')}>Удалить</button>
               </div>
             )}
           />
@@ -257,9 +273,9 @@ export function ManagerDashboard({ adminMode = false }: { adminMode?: boolean })
             actions={(item) => (
               <div className="inlineActions">
                 <button className="secondary" onClick={() => setForm(<SmartForm fields={eventFields} submitText="Сохранить" initialValues={item} onCancel={() => setForm(null)} onSubmit={(values) => run(() => eventsApi.update(Number(item.id), values), 'Мероприятие обновлено').then(() => setForm(null))} />)}>Изменить</button>
-                <button onClick={() => run(() => eventsApi.complete(Number(item.id)), 'Мероприятие завершено')}>Завершить</button>
+                <button disabled={actionKey === `complete-event-${item.id}`} onClick={() => run(() => eventsApi.complete(Number(item.id)), 'Мероприятие завершено', `complete-event-${item.id}`)}>{actionKey === `complete-event-${item.id}` ? 'Завершаем...' : 'Завершить'}</button>
                 <button className="secondary" onClick={() => setForm(<SmartForm fields={[{ name: 'startDateTime', label: 'Новая дата начала', type: 'datetime-local', required: true }, { name: 'endDateTime', label: 'Новая дата окончания', type: 'datetime-local', required: true }]} submitText='Перенести' onCancel={() => setForm(null)} onSubmit={(values) => run(() => eventsApi.postpone(Number(item.id), values), 'Мероприятие перенесено').then(() => setForm(null))} />)}>Перенести</button>
-                <button className="danger" onClick={() => confirmRun('Отменить мероприятие?', () => eventsApi.cancel(Number(item.id)), 'Мероприятие отменено')}>Отменить</button>
+                <button className="danger" disabled={actionKey === `cancel-event-${item.id}`} onClick={() => confirmRun('Отменить мероприятие?', () => eventsApi.cancel(Number(item.id)), 'Мероприятие отменено')}>Отменить</button>
               </div>
             )}
           />
@@ -277,9 +293,9 @@ export function ManagerDashboard({ adminMode = false }: { adminMode?: boolean })
             ]}
             actions={(item) => (
               <div className="inlineActions">
-                <button onClick={() => run(() => bookingsApi.confirm(Number(item.id)), 'Бронирование подтверждено')}>Подтвердить</button>
-                <button onClick={() => run(() => bookingsApi.complete(Number(item.id)), 'Бронирование завершено')}>Завершить</button>
-                <button className="secondary" onClick={() => run(() => paymentsApi.createMock(Number(item.id), 'CARD_MOCK'), 'Тестовая оплата создана')}>Создать тестовую оплату</button>
+                <button disabled={actionKey === `confirm-booking-${item.id}`} onClick={() => run(() => bookingsApi.confirm(Number(item.id)), 'Бронирование подтверждено', `confirm-booking-${item.id}`)}>{actionKey === `confirm-booking-${item.id}` ? 'Подтверждаем...' : 'Подтвердить'}</button>
+                <button disabled={actionKey === `complete-booking-${item.id}`} onClick={() => run(() => bookingsApi.complete(Number(item.id)), 'Бронирование завершено', `complete-booking-${item.id}`)}>{actionKey === `complete-booking-${item.id}` ? 'Завершаем...' : 'Завершить'}</button>
+                <button className="secondary" disabled={actionKey === `payment-booking-${item.id}`} onClick={() => run(() => paymentsApi.createMock(Number(item.id), 'CARD_MOCK'), 'Тестовая оплата создана', `payment-booking-${item.id}`)}>{actionKey === `payment-booking-${item.id}` ? 'Создаём...' : 'Создать тестовую оплату'}</button>
                 <button className="danger" onClick={() => confirmRun('Отменить бронирование?', () => bookingsApi.cancel(Number(item.id)), 'Бронирование отменено')}>Отменить</button>
               </div>
             )}
@@ -292,7 +308,7 @@ export function ManagerDashboard({ adminMode = false }: { adminMode?: boolean })
             items={payments}
             columns={[
               { key: 'id', title: '№' },
-              { key: 'booking', title: 'Бронь', render: (item) => label(item.booking?.id || item.bookingId) },
+              { key: 'bookingId', title: 'Бронь', render: (item) => `№ ${label(item.bookingId)}` },
               { key: 'method', title: 'Метод', render: (item) => enumLabel(item.method) },
               { key: 'amount', title: 'Сумма', render: (item) => formatPrice(item.amount) },
               { key: 'status', title: 'Статус', render: (item) => <StatusBadge value={item.status} /> },
@@ -300,9 +316,9 @@ export function ManagerDashboard({ adminMode = false }: { adminMode?: boolean })
             ]}
             actions={(item) => (
               <div className="inlineActions">
-                <button onClick={() => run(() => paymentsApi.paid(Number(item.id)), 'Оплата отмечена как оплаченная')}>Оплачено</button>
-                <button className="secondary" onClick={() => run(() => paymentsApi.partial(Number(item.id)), 'Оплата отмечена как частичная')}>Частичная</button>
-                <button className="secondary" onClick={() => run(() => paymentsApi.refund(Number(item.id)), 'Возврат оформлен')}>Возврат</button>
+                <button disabled={actionKey === `paid-${item.id}`} onClick={() => run(() => paymentsApi.paid(Number(item.id)), 'Оплата отмечена как оплаченная', `paid-${item.id}`)}>{actionKey === `paid-${item.id}` ? 'Сохраняем...' : 'Оплачено'}</button>
+                <button className="secondary" disabled={actionKey === `partial-${item.id}`} onClick={() => run(() => paymentsApi.partial(Number(item.id)), 'Оплата отмечена как частичная', `partial-${item.id}`)}>{actionKey === `partial-${item.id}` ? 'Сохраняем...' : 'Частичная'}</button>
+                <button className="secondary" disabled={actionKey === `refund-${item.id}`} onClick={() => run(() => paymentsApi.refund(Number(item.id)), 'Возврат оформлен', `refund-${item.id}`)}>{actionKey === `refund-${item.id}` ? 'Оформляем...' : 'Возврат'}</button>
                 <button className="danger" onClick={() => confirmRun('Отменить оплату?', () => paymentsApi.cancel(Number(item.id)), 'Оплата отменена')}>Отменить</button>
               </div>
             )}
@@ -352,7 +368,7 @@ export function ManagerDashboard({ adminMode = false }: { adminMode?: boolean })
           <div className="filters">
             <input type="date" value={period.from} onChange={(event) => setPeriod({ ...period, from: event.target.value })} />
             <input type="date" value={period.to} onChange={(event) => setPeriod({ ...period, to: event.target.value })} />
-            <button onClick={() => void loadReports()}>Загрузить отчёты</button>
+            <button disabled={actionKey === 'reports'} onClick={() => void run(loadReports, 'Отчёты загружены', 'reports')}>{actionKey === 'reports' ? 'Загружаем...' : 'Загрузить отчёты'}</button>
           </div>
           <div className="reportGrid">
             {Object.entries(reports).map(([name, rows]) => <div className="panel inset" key={name}><h3>{reportTitle(name)}</h3><JsonCard data={rows} /></div>)}
@@ -378,10 +394,16 @@ export function ManagerDashboard({ adminMode = false }: { adminMode?: boolean })
         <WorkPanel title="Сотрудники" action="Создать сотрудника" onAction={() => setForm(<SmartForm fields={[{ name: 'email', label: 'Эл. почта', type: 'email', required: true }, { name: 'password', label: 'Пароль', type: 'password', required: true }, { name: 'fullName', label: 'ФИО', required: true }, { name: 'role', label: 'Роль', type: 'select', required: true, options: ['MANAGER', 'INSTRUCTOR', 'ADMIN'] }, { name: 'phone', label: 'Телефон' }]} submitText="Создать" onCancel={() => setForm(null)} onSubmit={(values) => run(() => employeesApi.create(values), 'Сотрудник создан').then(() => setForm(null))} />)}>
           <DataTable
             items={employees}
-            columns={[{ key: 'id', title: '№' }, { key: 'email', title: 'Эл. почта' }, { key: 'fullName', title: 'ФИО', render: (item) => userName(item) }, { key: 'role', title: 'Роль', render: (item) => enumLabel(item.role) }]}
+            columns={[
+              { key: 'id', title: '№' },
+              { key: 'email', title: 'Эл. почта', render: (item) => employeeUser(item)?.email || '-' },
+              { key: 'fullName', title: 'ФИО', render: (item) => userName(employeeUser(item)) },
+              { key: 'role', title: 'Роль', render: (item) => enumLabel(employeeUser(item)?.role) },
+              { key: 'active', title: 'Активен', render: (item) => item.active ? 'Да' : 'Нет' },
+            ]}
             actions={(item) => (
               <div className="inlineActions">
-                <button className="secondary" onClick={() => setForm(<SmartForm fields={[{ name: 'email', label: 'Эл. почта', type: 'email' }, { name: 'fullName', label: 'ФИО' }, { name: 'role', label: 'Роль', type: 'select', options: ['MANAGER', 'INSTRUCTOR', 'ADMIN'] }, { name: 'phone', label: 'Телефон' }]} submitText="Сохранить" initialValues={item} onCancel={() => setForm(null)} onSubmit={(values) => run(() => employeesApi.update(Number(item.id), values), 'Сотрудник обновлён').then(() => setForm(null))} />)}>Изменить</button>
+                <button className="secondary" onClick={() => setForm(<SmartForm fields={[{ name: 'email', label: 'Эл. почта', type: 'email' }, { name: 'fullName', label: 'ФИО' }, { name: 'role', label: 'Роль', type: 'select', options: ['MANAGER', 'INSTRUCTOR', 'ADMIN'] }, { name: 'phone', label: 'Телефон' }]} submitText="Сохранить" initialValues={employeeUser(item) || {}} onCancel={() => setForm(null)} onSubmit={(values) => run(() => employeesApi.update(Number(item.id), values), 'Сотрудник обновлён').then(() => setForm(null))} />)}>Изменить</button>
                 <button className="danger" onClick={() => confirmRun('Деактивировать сотрудника?', () => employeesApi.deactivate(Number(item.id)), 'Сотрудник деактивирован')}>Деактивировать</button>
               </div>
             )}
@@ -389,6 +411,19 @@ export function ManagerDashboard({ adminMode = false }: { adminMode?: boolean })
         </WorkPanel>
       )}
       {form && <Modal title="Форма" onClose={() => setForm(null)}>{form}</Modal>}
+      {confirm && (
+        <ConfirmModal
+          message={confirm.text}
+          danger={confirm.danger}
+          loading={Boolean(actionKey)}
+          onCancel={() => setConfirm(null)}
+          onConfirm={() => {
+            const current = confirm;
+            setConfirm(null);
+            void run(current.action, current.success, current.success || current.text);
+          }}
+        />
+      )}
     </section>
   );
 }
