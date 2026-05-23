@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { activitiesApi, eventsApi, reviewsApi } from '../api/endpoints';
 import { StatusBadge } from '../components/StatusBadge';
 import type { ActivityCategoryDto, ActivityDto, EventDto, ReviewDto } from '../types';
-import { activityTitle, formatDate, label } from '../utils';
+import { activityTitle, formatDate, formatPrice, label } from '../utils';
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -63,7 +63,7 @@ export function HomePage() {
                   </div>
                   <p>{activity.shortDescription || activity.description || 'Программа активного отдыха'}</p>
                   <div className="metaLine"><MapPin size={15} /> {label(activity.location)} · {label(activity.durationHours)} ч · {label(activity.difficultyLevel)}</div>
-                  <strong>{label(activity.price)} ₽</strong>
+                  <strong>{formatPrice(activity.price)}</strong>
                 </div>
               </Link>
             ))}
