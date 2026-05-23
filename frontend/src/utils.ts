@@ -1,9 +1,10 @@
-﻿import type { ActivityDto, BookingDto, EventDto, UserDto } from './types';
+import type { ActivityDto, BookingDto, EmployeeDto, EventDto, UserDto } from './types';
 
 export function label(value: unknown): string {
   if (value === null || value === undefined || value === '') return '-';
   if (typeof value === 'string') return enumLabel(value);
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'boolean') return value ? 'Да' : 'Нет';
   if (typeof value === 'object') {
     const item = value as Record<string, unknown>;
     return String(item.name || item.title || item.email || item.id || JSON.stringify(item));
@@ -25,6 +26,11 @@ export function userName(user?: UserDto | null): string {
   return user?.fullName || user?.name || user?.email || (user?.id ? `Пользователь #${user.id}` : '-');
 }
 
+export function employeeUser(employee?: EmployeeDto | UserDto | null): UserDto | null {
+  if (!employee) return null;
+  return 'user' in employee && employee.user ? (employee.user as UserDto) : (employee as UserDto);
+}
+
 export function bookingTitle(booking?: BookingDto | null): string {
   return booking?.id ? `Бронирование #${booking.id}` : '-';
 }
@@ -33,11 +39,17 @@ export function formatDate(value?: string): string {
   if (!value) return '-';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('ru-RU');
+  return date.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export function objectRows(item: Record<string, unknown>): Array<[string, string]> {
-  return Object.entries(item).map(([key, value]) => [key, label(value)]);
+  return Object.entries(item).map(([key, value]) => [fieldLabel(key), label(value)]);
 }
 
 export function isManagerRole(role?: string) {
@@ -66,10 +78,15 @@ const enumLabels: Record<string, string> = {
   CASH: 'Наличные',
   CARD_MOCK: 'Тестовая карта',
   BANK_TRANSFER_MOCK: 'Тестовый банковский перевод',
+  CONTRACT: 'Договор',
+  BOOKING_FORM: 'Форма бронирования',
+  PARTICIPANT_LIST: 'Список участников',
+  EVENT_REPORT: 'Отчёт по мероприятию',
   CLIENT: 'Клиент',
   MANAGER: 'Менеджер',
   INSTRUCTOR: 'Инструктор',
   ADMIN: 'Администратор',
+  BOOKING_CREATED: 'Бронирование создано',
   BOOKING_CONFIRMED: 'Бронирование подтверждено',
   BOOKING_CANCELLED: 'Бронирование отменено',
   PAYMENT_STATUS_CHANGED: 'Статус оплаты изменён',
@@ -80,6 +97,36 @@ const enumLabels: Record<string, string> = {
 export function enumLabel(value?: string | null): string {
   if (!value) return '-';
   return enumLabels[value] || value;
+}
+
+const fieldLabels: Record<string, string> = {
+  id: '№',
+  email: 'Эл. почта',
+  fullName: 'ФИО',
+  phone: 'Телефон',
+  role: 'Роль',
+  enabled: 'Активен',
+  active: 'Активен',
+  status: 'Статус',
+  amount: 'Сумма',
+  totalPrice: 'Сумма',
+  paidRevenue: 'Тестовая выручка',
+  createdAt: 'Создано',
+  updatedAt: 'Обновлено',
+  mockTransactionId: 'Тестовая транзакция',
+  bookingId: 'Бронирование',
+  eventId: 'Мероприятие',
+  activityId: 'Активность',
+  participantsCount: 'Участников',
+  rating: 'Оценка',
+  text: 'Текст',
+  message: 'Сообщение',
+  title: 'Название',
+  name: 'Название',
+};
+
+export function fieldLabel(value: string): string {
+  return fieldLabels[value] || value;
 }
 
 export function reportTitle(value: string): string {
@@ -108,4 +155,3 @@ export function formatPrice(value?: number | string | null): string {
   if (Number.isNaN(number)) return String(value);
   return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(number);
 }
-

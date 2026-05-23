@@ -30,6 +30,7 @@ export interface UserDto {
   name?: string;
   phone?: string;
   role: Role;
+  enabled?: boolean;
   blocked?: boolean;
   active?: boolean;
   [key: string]: unknown;
@@ -126,12 +127,12 @@ export interface BookingDto {
 
 export interface PaymentDto {
   id: number;
-  booking?: BookingDto;
   bookingId?: number;
   amount?: number;
   method?: PaymentMethod;
   status?: PaymentStatus;
   mockTransactionId?: string;
+  paidAt?: string;
   createdAt?: string;
   [key: string]: unknown;
 }
@@ -140,9 +141,11 @@ export interface EquipmentDto {
   id: number;
   name: string;
   category?: string | { id: number; name: string };
+  quantityTotal?: number;
+  quantityAvailable?: number;
   conditionStatus?: EquipmentConditionStatus;
   status?: EquipmentConditionStatus;
-  inventoryNumber?: string;
+  description?: string;
   [key: string]: unknown;
 }
 
@@ -172,10 +175,21 @@ export interface NotificationDto {
 
 export interface DocumentDto {
   id: number;
+  bookingId?: number;
   type?: DocumentType;
   fileName?: string;
-  url?: string;
+  content?: string;
   createdAt?: string;
+  [key: string]: unknown;
+}
+
+export interface EmployeeDto {
+  id: number;
+  user: UserDto;
+  specialization?: string;
+  experienceYears?: number;
+  bio?: string;
+  active?: boolean;
   [key: string]: unknown;
 }
 
